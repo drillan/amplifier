@@ -286,6 +286,7 @@ def main():
     # List command - outputs metadata only
     list_parser = subparsers.add_parser("list", help="List transcript metadata")
     list_parser.add_argument("--last", type=int, help="Show last N transcripts")
+    list_parser.add_argument("--days", type=int, help="Show transcripts from the last N days")
     list_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Search command - outputs matching content
@@ -331,10 +332,32 @@ def main():
             sys.exit(1)
 
     elif args.command == "list":
+        transcripts = manager.list_transcripts(last_n=args.last)
+
+        # Apply date filtering if --days specified
+        if args.days is not None:
+            cutoff_time = datetime.now() - timedelta(days=args.days)  # noqa: DTZ005
+            transcripts = [
+                t for t in transcripts
+                if datetime.fromtimestamp(t.stat().st_mtime) >= cutoff_time  # noqa: DTZ006
+            ]
+
         if args.json:
-            print(manager.list_transcripts_json(last_n=args.last))
+            # Build JSON output with filtered transcripts
+            results = []
+            for t in transcripts:
+                match = re.search(r"compact_\d+_\d+_([a-f0-9-]+)\.txt", t.name)
+                session_id = match.group(1) if match else "unknown"
+                mtime = datetime.fromtimestamp(t.stat().st_mtime)  # noqa: DTZ006
+                size_kb = t.stat().st_size / 1024
+                results.append({
+                    "session_id": session_id,
+                    "filename": t.name,
+                    "timestamp": mtime.isoformat(),
+                    "size_kb": round(size_kb, 1),
+                })
+            print(json.dumps(results, indent=2))
         else:
-            transcripts = manager.list_transcripts(last_n=args.last)
             if not transcripts:
                 print("No transcripts found")
             else:

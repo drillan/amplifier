@@ -4,13 +4,19 @@ Transcript Manager - CLI tool for managing Claude Code conversation transcripts
 A pure CLI that outputs transcript content directly for consumption by agents
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import re
 import shutil
 import sys
 from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
+
+# Default: only restore transcripts from the last 7 days
+DEFAULT_RESTORE_DAYS = 7
 
 
 class TranscriptManager:
@@ -66,15 +72,53 @@ class TranscriptManager:
 
         return None
 
-    def restore_conversation_lineage(self, session_id: str | None = None) -> str | None:
-        """Restore entire conversation lineage by outputting all transcript content"""
+    def restore_conversation_lineage(
+        self,
+        session_id: str | None = None,
+        days: int | None = None,
+        restore_all: bool = False,
+    ) -> str | None:
+        """Restore conversation lineage by outputting transcript content.
+
+        Args:
+            session_id: If specified, restore only transcripts matching this session ID
+            days: If specified, restore only transcripts from the last N days
+            restore_all: If True, restore all transcripts regardless of age
+
+        By default (no arguments), restores transcripts from the last DEFAULT_RESTORE_DAYS days.
+        """
         # Get all available transcripts
         transcripts = self.list_transcripts()
         if not transcripts:
             return None
 
-        # Sort transcripts by modification time (oldest first) to maintain chronological order
-        transcripts_to_process = sorted(transcripts, key=lambda p: p.stat().st_mtime)
+        # Apply filters
+        transcripts_to_process = []
+        cutoff_time = None
+
+        # Determine cutoff time for date filtering
+        if not restore_all:
+            filter_days = days if days is not None else DEFAULT_RESTORE_DAYS
+            cutoff_time = datetime.now() - timedelta(days=filter_days)  # noqa: DTZ005
+
+        for transcript_file in transcripts:
+            # Filter by session ID if specified
+            if session_id and session_id not in transcript_file.name:
+                continue
+
+            # Filter by date if not restoring all
+            if cutoff_time:
+                file_mtime = datetime.fromtimestamp(transcript_file.stat().st_mtime)  # noqa: DTZ006
+                if file_mtime < cutoff_time:
+                    continue
+
+            transcripts_to_process.append(transcript_file)
+
+        if not transcripts_to_process:
+            return None
+
+        # Sort by modification time (oldest first) to maintain chronological order
+        transcripts_to_process = sorted(transcripts_to_process, key=lambda p: p.stat().st_mtime)
 
         combined_content = []
         sessions_restored = 0
@@ -221,7 +265,19 @@ def main():
 
     # Restore command - outputs full conversation lineage content
     restore_parser = subparsers.add_parser("restore", help="Output entire conversation lineage content")
-    restore_parser.add_argument("--session-id", help="Session ID to restore (default: current/latest)")
+    restore_parser.add_argument("--session-id", help="Restore only transcripts matching this session ID")
+    restore_parser.add_argument(
+        "--days",
+        type=int,
+        default=None,
+        help=f"Restore transcripts from the last N days (default: {DEFAULT_RESTORE_DAYS})",
+    )
+    restore_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="restore_all",
+        help="Restore all transcripts regardless of age",
+    )
 
     # Load command - outputs specific transcript content
     load_parser = subparsers.add_parser("load", help="Output transcript content")
@@ -230,6 +286,7 @@ def main():
     # List command - outputs metadata only
     list_parser = subparsers.add_parser("list", help="List transcript metadata")
     list_parser.add_argument("--last", type=int, help="Show last N transcripts")
+    list_parser.add_argument("--days", type=int, help="Show transcripts from the last N days")
     list_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # Search command - outputs matching content
@@ -247,11 +304,23 @@ def main():
     manager = TranscriptManager()
 
     if args.command == "restore":
-        content = manager.restore_conversation_lineage(session_id=args.session_id)
+        content = manager.restore_conversation_lineage(
+            session_id=args.session_id,
+            days=args.days,
+            restore_all=args.restore_all,
+        )
         if content:
             print(content)
         else:
-            print("Error: No transcripts found to restore", file=sys.stderr)
+            if args.restore_all:
+                print("Error: No transcripts found to restore", file=sys.stderr)
+            else:
+                days_used = args.days if args.days is not None else DEFAULT_RESTORE_DAYS
+                print(
+                    f"Error: No transcripts found in the last {days_used} days. "
+                    f"Use --days N for a different range or --all for all transcripts.",
+                    file=sys.stderr,
+                )
             sys.exit(1)
 
     elif args.command == "load":
@@ -263,10 +332,32 @@ def main():
             sys.exit(1)
 
     elif args.command == "list":
+        transcripts = manager.list_transcripts(last_n=args.last)
+
+        # Apply date filtering if --days specified
+        if args.days is not None:
+            cutoff_time = datetime.now() - timedelta(days=args.days)  # noqa: DTZ005
+            transcripts = [
+                t for t in transcripts
+                if datetime.fromtimestamp(t.stat().st_mtime) >= cutoff_time  # noqa: DTZ006
+            ]
+
         if args.json:
-            print(manager.list_transcripts_json(last_n=args.last))
+            # Build JSON output with filtered transcripts
+            results = []
+            for t in transcripts:
+                match = re.search(r"compact_\d+_\d+_([a-f0-9-]+)\.txt", t.name)
+                session_id = match.group(1) if match else "unknown"
+                mtime = datetime.fromtimestamp(t.stat().st_mtime)  # noqa: DTZ006
+                size_kb = t.stat().st_size / 1024
+                results.append({
+                    "session_id": session_id,
+                    "filename": t.name,
+                    "timestamp": mtime.isoformat(),
+                    "size_kb": round(size_kb, 1),
+                })
+            print(json.dumps(results, indent=2))
         else:
-            transcripts = manager.list_transcripts(last_n=args.last)
             if not transcripts:
                 print("No transcripts found")
             else:

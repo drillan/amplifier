@@ -6,16 +6,22 @@ This project uses a shared context file (`AGENTS.md`) for common project guideli
 
 This file is reserved for Claude Code-specific instructions.
 
-# import the following files (using the `@` syntax):
+# Claude Code Skills
 
-- @AGENTS.md
-- @DISCOVERIES.md
-- @ai_context/IMPLEMENTATION_PHILOSOPHY.md
-- @ai_context/MODULAR_DESIGN_PHILOSOPHY.md
-- @ai_context/DESIGN-PHILOSOPHY.md
-- @ai_context/DESIGN-PRINCIPLES.md
-- @ai_context/design/DESIGN-FRAMEWORK.md
-- @ai_context/design/DESIGN-VISION.md
+This project uses Claude Code Skills for context optimization.
+Skills are loaded dynamically as needed, minimizing always-loaded context.
+
+## Available Skills
+
+- `design-philosophy` - Five pillars of design philosophy
+- `implementation-guide` - Implementation philosophy and modular design
+- `agent-usage` - Effective sub-agent usage and parallel execution
+- `discoveries` - Non-obvious problems, solutions, and patterns
+
+## Core Context (Always Loaded)
+
+- @AGENTS.md - AI assistant guidance
+- @DISCOVERIES.md - Recent discoveries
 
 # Claude's Working Philosophy and Memory System
 
@@ -205,8 +211,7 @@ Single message with multiple Task calls:
 
 ## Philosophical Anchors
 
-- Always reference `@ai_context/IMPLEMENTATION_PHILOSOPHY.md`
-- Always reference `@ai_context/MODULAR_DESIGN_PHILOSOPHY.md`
+- Use `design-philosophy` and `implementation-guide` skills for detailed guidance
 - Embrace ruthless simplicity
 - Build as bricks and studs
 - Trust in emergence over control

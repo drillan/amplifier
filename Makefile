@@ -148,13 +148,13 @@ install: ## Install all dependencies
 	@echo ""
 	@echo "Installing npm packages globally..."
 	@command -v pnpm >/dev/null 2>&1 || { echo "  Installing pnpm..."; npm install -g pnpm; }
-	@pnpm add -g @anthropic-ai/claude-code@latest || { \
-		echo "❌ Failed to install global packages."; \
-		echo "   This may be a permissions issue. Try:"; \
-		echo "   1. Run: pnpm setup && source ~/.bashrc (or ~/.zshrc)"; \
-		echo "   2. Then run: make install"; \
-		exit 1; \
-	}
+# 	@pnpm add -g @anthropic-ai/claude-code@latest || { \
+# 		echo "❌ Failed to install global packages."; \
+# 		echo "   This may be a permissions issue. Try:"; \
+# 		echo "   1. Run: pnpm setup && source ~/.bashrc (or ~/.zshrc)"; \
+# 		echo "   2. Then run: make install"; \
+# 		exit 1; \
+# 	}
 	@echo ""
 	@echo "✅ All dependencies installed!"
 	@echo ""
@@ -184,7 +184,7 @@ check: ## Format, lint, and type-check all code
 	@echo "Type-checking code with pyright..."
 	@VIRTUAL_ENV= uv run pyright
 	@echo "Checking for stubs and placeholders..."
-	@python tools/check_stubs.py
+	@uv run python tools/check_stubs.py
 	@echo "All checks passed!"
 
 test: ## Run all tests

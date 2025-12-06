@@ -338,7 +338,8 @@ def main():
         if args.days is not None:
             cutoff_time = datetime.now() - timedelta(days=args.days)  # noqa: DTZ005
             transcripts = [
-                t for t in transcripts
+                t
+                for t in transcripts
                 if datetime.fromtimestamp(t.stat().st_mtime) >= cutoff_time  # noqa: DTZ006
             ]
 
@@ -350,12 +351,14 @@ def main():
                 session_id = match.group(1) if match else "unknown"
                 mtime = datetime.fromtimestamp(t.stat().st_mtime)  # noqa: DTZ006
                 size_kb = t.stat().st_size / 1024
-                results.append({
-                    "session_id": session_id,
-                    "filename": t.name,
-                    "timestamp": mtime.isoformat(),
-                    "size_kb": round(size_kb, 1),
-                })
+                results.append(
+                    {
+                        "session_id": session_id,
+                        "filename": t.name,
+                        "timestamp": mtime.isoformat(),
+                        "size_kb": round(size_kb, 1),
+                    }
+                )
             print(json.dumps(results, indent=2))
         else:
             if not transcripts:
